@@ -66,6 +66,7 @@
     <label><input type="checkbox" class="show" value="meaning"> meaning</label>
     <label>No. <input type="number" id="start" min="1" value="1"> – <input type="number" id="end" min="1" value="1"></label>
     <label><input type="checkbox" id="norepeat"> don't repeat</label>
+    <label><input type="checkbox" id="autospeak" checked> 🔊 read aloud</label>
     <span>Words: <b id="count">0</b></span>
   </div>
 
@@ -147,7 +148,7 @@ function reveal() {
   const li = document.createElement("li");
   li.textContent = `#${current.no} ${current.word} (${current.pinyin}) — ${meanings(current)}`;
   $("histlist").prepend(li);
-  speak();
+  if ($("autospeak").checked) speak();
 }
 
 function speak() {

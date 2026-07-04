@@ -66,6 +66,7 @@
     <label><input type="checkbox" class="show" value="meaning"> meaning</label>
     <label>No. <input type="number" id="start" min="1" value="1"> – <input type="number" id="end" min="1" value="1"></label>
     <label><input type="checkbox" id="norepeat"> don't repeat</label>
+    <span>Words: <b id="count">0</b></span>
   </div>
 
   <div id="card">Loading…</div>
@@ -78,7 +79,7 @@
   <div id="history"><h3>History</h3><ul id="histlist"></ul></div>
 
 <script>
-let cards = [], current = null, revealed = false;
+let cards = [], current = null, revealed = false, shown = 0;
 const seen = new Set();
 const $ = id => document.getElementById(id);
 const meanings = c => c.senses.map(s => s.meaning_th).join(", ");
@@ -107,6 +108,7 @@ function draw() {
   }
   current = p[Math.floor(Math.random() * p.length)];
   seen.add(current.no);
+  $("count").textContent = ++shown;
   revealed = false;
   renderFront();
 }

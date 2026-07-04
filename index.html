@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcards</title>
+<style>
+  :root {
+    --bg: #fdf6f0;
+    --card: #ffffff;
+    --pink: #f9d5e5;
+    --mint: #d5f0e3;
+    --lav: #e3d5f0;
+    --peach: #fde2cf;
+    --ink: #5b5364;
+    --accent: #b48ead;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.5rem;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  }
+  #controls {
+    background: var(--mint); border-radius: 16px; padding: .8rem 1.2rem;
+    display: flex; flex-wrap: wrap; gap: .8rem 1.4rem; align-items: center;
+    max-width: 720px;
+  }
+  #controls label { display: flex; align-items: center; gap: .3rem; }
+  #controls input[type=number] { width: 5em; border: 1px solid var(--accent); border-radius: 8px; padding: .2rem .4rem; background: #fff; color: var(--ink); }
+  #card {
+    background: var(--card); border: 3px solid var(--pink); border-radius: 24px;
+    padding: 2rem; width: 100%; max-width: 720px; min-height: 16rem;
+    box-shadow: 0 6px 20px rgba(180,142,173,.25);
+    text-align: center; cursor: pointer;
+  }
+  #card .word { font-size: 4rem; margin: .2em 0; }
+  #card .pinyin { font-size: 1.6rem; color: var(--accent); }
+  #card .no { font-size: .85rem; opacity: .6; }
+  #card .meaning { font-size: 1.3rem; }
+  .sense { background: var(--lav); border-radius: 12px; padding: .5rem .8rem; margin: .5rem auto; max-width: 32rem; text-align: left; }
+  .sense .pos { font-weight: bold; margin-right: .4em; }
+  .sense .ex { font-size: .95rem; opacity: .8; margin-top: .2rem; }
+  #card img { max-width: 100%; max-height: 220px; margin-top: 1rem; border-radius: 12px; }
+  #next, #hint {
+    background: var(--peach); border: none; border-radius: 999px;
+    padding: .7rem 2.5rem; font-size: 1.1rem; color: var(--ink); cursor: pointer;
+    box-shadow: 0 3px 8px rgba(180,142,173,.3);
+  }
+  #hint { background: var(--lav); padding: .7rem 1.5rem; }
+  #next:active, #hint:active { transform: scale(.97); }
+  #history { max-width: 720px; width: 100%; }
+  #history h3 { margin: .5rem 0; }
+  #history ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .35rem; }
+  #history li { background: var(--pink); border-radius: 10px; padding: .4rem .8rem; font-size: .95rem; }
+  .hint { font-size: .85rem; opacity: .6; }
+  .say { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div id="controls">
+    <span>Show:</span>
+    <label><input type="checkbox" class="show" value="word" checked> word</label>
+    <label><input type="checkbox" class="show" value="pinyin"> pinyin</label>
+    <label><input type="checkbox" class="show" value="meaning"> meaning</label>
+    <label>No. <input type="number" id="start" min="1" value="1"> – <input type="number" id="end" min="1" value="1"></label>
+    <label><input type="checkbox" id="norepeat"> don't repeat</label>
+  </div>
+
+  <div id="card">Loading…</div>
+  <div style="display:flex; gap:.8rem">
+    <button id="next">Next (Space)</button>
+    <button id="hint">Hint</button>
+  </div>
+  <p class="hint">Click card / button or press Space: reveal answer → next word</p>
+
+  <div id="history"><h3>History</h3><ul id="histlist"></ul></div>
+
+<script>
+let cards = [], current = null, revealed = false;
+const seen = new Set();
+const $ = id => document.getElementById(id);
+const meanings = c => c.senses.map(s => s.meaning_th).join(", ");
+
+fetch("data/flashcards.json").then(r => r.json()).then(d => {
+  cards = d;
+  const max = Math.max(...cards.map(c => c.no));
+  $("end").value = max; $("start").max = max; $("end").max = max;
+  draw();
+});
+
+function pool() {
+  const a = +$("start").value || 1, b = +$("end").value || 1;
+  let p = cards.filter(c => c.no >= a && c.no <= b);
+  if ($("norepeat").checked) p = p.filter(c => !seen.has(c.no));
+  return p;
+}
+
+function draw() {
+  const p = pool();
+  if (!p.length) {
+    seen.clear(); // ponytail: auto-reset when range exhausted
+    $("card").innerHTML = "<p>🎉 All words in range done! Seen list reset — continue for a new round.</p>";
+    current = null; revealed = false;
+    return;
+  }
+  current = p[Math.floor(Math.random() * p.length)];
+  seen.add(current.no);
+  revealed = false;
+  renderFront();
+}
+
+function renderFront() {
+  const show = [...document.querySelectorAll(".show:checked")].map(x => x.value);
+  let html = `<div class="no">#${current.no}</div>`;
+  if (show.includes("word")) html += `<div class="word">${current.word}</div>`;
+  if (show.includes("pinyin")) html += `<div class="pinyin">${current.pinyin}</div>`;
+  if (show.includes("meaning")) html += `<div class="meaning">${meanings(current)}</div>`;
+  if (!show.length) html += `<div class="meaning">(nothing selected — check a box above)</div>`;
+  $("card").innerHTML = html;
+}
+
+function hint() {
+  if (!current || revealed) return;
+  renderFront();
+  let html = "";
+  for (const s of current.senses)
+    html += `<div class="sense"><span class="pos">${s.pos || ""}</span>
+      ${(s.examples || []).map(e => `<div class="ex">${e}</div>`).join("")}</div>`;
+  $("card").innerHTML += html;
+}
+
+function reveal() {
+  revealed = true;
+  let html = `<div class="no">#${current.no}</div>
+    <div class="word">${current.word}</div>
+    <div class="pinyin">${current.pinyin} <button class="say" onclick="event.stopPropagation();speak()">🔊</button></div>`;
+  for (const s of current.senses)
+    html += `<div class="sense"><span class="pos">${s.pos || ""}</span>${s.meaning_th}
+      ${(s.examples || []).map(e => `<div class="ex">${e}</div>`).join("")}</div>`;
+  for (const img of current.images || [])
+    html += `<img src="data/${img}" alt="${current.word}">`;
+  $("card").innerHTML = html;
+  const li = document.createElement("li");
+  li.textContent = `#${current.no} ${current.word} (${current.pinyin}) — ${meanings(current)}`;
+  $("histlist").prepend(li);
+  speak();
+}
+
+function speak() {
+  const u = new SpeechSynthesisUtterance(current.word);
+  u.lang = "zh-CN";
+  speechSynthesis.speak(u);
+}
+
+function advance() {
+  if (!cards.length) return;
+  (current && !revealed) ? reveal() : draw();
+}
+
+$("next").onclick = advance;
+$("hint").onclick = hint;
+$("card").onclick = advance;
+document.querySelectorAll(".show").forEach(x =>
+  x.onchange = () => { if (current && !revealed) renderFront(); });
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); advance(); }
+});
+</script>
+</body>
+</html>
